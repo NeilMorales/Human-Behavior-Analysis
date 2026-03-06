@@ -428,7 +428,7 @@ Dashboard Page → API Route → Supabase Client → PostgreSQL
       "command": "npx",
       "args": ["@_davideast/stitch-mcp", "proxy"],
       "env": {
-        "STITCH_API_KEY": "AQ.Ab8RN6LfMPH8ynjiJkC4KW4afRW0xC10ZCvYeK2payB9Jf_wlg"
+        "STITCH_API_KEY": "Your_stitch_api_key_here"
       },
       "disabled": false,
       "autoApprove": []
