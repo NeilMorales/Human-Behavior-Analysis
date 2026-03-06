@@ -1,4 +1,4 @@
-import { readStorage, appendEvent } from '../shared/storage';
+import { readStorage, appendEvent, writeStorage } from '../shared/storage';
 import { parseDomain, getTodayDate, getClassification, getLastEventOfType } from '../shared/utils';
 import { fireInterruptionNotification } from './notificationManager';
 
@@ -37,9 +37,18 @@ export async function handleTabActivated({ tabId }: { tabId: number, windowId?: 
             date,
         });
 
-        // 4. If focus session active and new domain is distracting: flag interruption
+        // 4. If focus session active and new domain is distracting: increment interruption count
         if (storage.activeSession?.status === 'in_progress' && classification === 'distracting') {
-            // Logic for incrementing interruption is in session manager
+            // Increment interruption count
+            const updatedSession = {
+                ...storage.activeSession,
+                interruptionCount: storage.activeSession.interruptionCount + 1,
+            };
+            
+            // Update in storage
+            await writeStorage({ activeSession: updatedSession });
+            
+            // Fire notification
             await fireInterruptionNotification(domain, storage.activeSession.taskName);
         }
     }

@@ -106,7 +106,10 @@ export async function attemptSync(): Promise<void> {
 
         await writeStorage({ lastSyncAt: Date.now() });
 
-        // Purge old events feature can be implemented here...
+        // Check storage quota and purge if needed
+        const { checkStorageQuota } = await import('../shared/storage');
+        await checkStorageQuota();
+
     } catch (error) {
         console.error('Sync error:', error);
         // Network error — silent fail, retry in 5 minutes
