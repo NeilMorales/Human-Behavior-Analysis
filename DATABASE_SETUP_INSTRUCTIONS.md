@@ -132,7 +132,7 @@ ON CONFLICT (user_id) DO NOTHING;
 1. Check if user exists in users table first
 2. Verify extension is logged in (check chrome.storage.local)
 3. Check browser console for sync errors
-4. Verify SUPABASE_SERVICE_ROLE_KEY is set in frontend/.env.local
+4. Verify SUPABASE_SERVICE_ROLE_KEY is set in .env and frontend/.env
 
 ---
 
@@ -164,7 +164,7 @@ ON CONFLICT (user_id) DO NOTHING;
 
 - **Email verification is DISABLED** - This is for testing only
 - **Re-enable email verification before production** - See DISABLE_EMAIL_VERIFICATION.md
-- **Service role key needed** - Add to frontend/.env.local from Supabase dashboard
+- **Service role key needed** - Add to .env and frontend/.env from Supabase dashboard
 - **RLS policies are active** - Users can only see their own data
 
 ---

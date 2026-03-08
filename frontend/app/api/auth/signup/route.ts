@@ -27,24 +27,36 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Failed to create user' }, { status: 500 });
         }
 
-        // Step 2: Insert user row in users table
-        // The trigger should create user_settings automatically
-        const { error: insertError } = await supabase.from('users').insert({
-            user_id: authData.user.id,
-            name: name,
-            email: email,
-            timezone: timezone || 'UTC',
-            role: 'user',
-            is_active: true,
-        });
+        // Step 2: Wait a moment for trigger to fire
+        await new Promise(resolve => setTimeout(resolve, 500));
 
-        if (insertError) {
-            console.error('Error inserting user row:', insertError);
-            // Don't fail the signup, user can still use the app
-            // The trigger might have already created it
+        // Step 3: Check if user row was created by trigger
+        const { data: userRow, error: userCheckError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('user_id', authData.user.id)
+            .maybeSingle();
+
+        // If trigger didn't create user, create manually
+        if (!userRow && !userCheckError) {
+            const { error: insertError } = await supabase.from('users').insert({
+                user_id: authData.user.id,
+                name: name,
+                email: email,
+                timezone: timezone || 'UTC',
+                role: 'user',
+                is_active: true,
+            });
+
+            if (insertError) {
+                console.error('Error inserting user row:', insertError);
+                return NextResponse.json({ 
+                    error: `Database error: ${insertError.message}. Please make sure you ran the database migration.` 
+                }, { status: 500 });
+            }
         }
 
-        // Step 3: Verify user_settings was created by trigger
+        // Step 4: Verify user_settings was created by trigger
         const { data: settings, error: settingsError } = await supabase
             .from('user_settings')
             .select('*')

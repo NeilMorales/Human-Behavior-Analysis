@@ -2,17 +2,29 @@ import { readStorage, appendEvent, writeStorage } from '../shared/storage';
 import { parseDomain, getTodayDate, getClassification, getLastEventOfType } from '../shared/utils';
 import { fireInterruptionNotification } from './notificationManager';
 
+// Interface for website visit tracking
+interface WebsiteVisit {
+    id: string;
+    sessionId: string;
+    domain: string;
+    classification: string;
+    startTime: number;
+    endTime: number | null;
+    durationSeconds: number | null;
+    synced: boolean;
+}
+
 export async function handleTabActivated({ tabId }: { tabId: number, windowId?: number }) {
     const tab = await chrome.tabs.get(tabId);
     const domain = parseDomain(tab.url);
     const now = Date.now();
 
     // 1. Read current tracking state from storage
-    const storage = await readStorage(['activeSession', 'settings', 'eventLog']);
+    const storage = await readStorage(['activeSession', 'settings', 'eventLog', 'websiteVisits']);
     const settings = storage.settings;
     const date = getTodayDate(settings?.timezone ?? 'UTC');
 
-    // 2. Write tab_blur event for previous domain (if any)
+    // 2. Write tab_blur event for previous domain (if any) and update website visit
     const lastFocusEvent = getLastEventOfType(storage.eventLog?.[date] ?? [], 'tab_focus');
     if (lastFocusEvent && !lastFocusEvent.domain?.startsWith('chrome://')) {
         await appendEvent({
@@ -23,6 +35,16 @@ export async function handleTabActivated({ tabId }: { tabId: number, windowId?: 
             focusSessionId: storage.activeSession?.id ?? null,
             date,
         });
+
+        // Update website visit with end time and duration
+        if (storage.activeSession?.id && lastFocusEvent.domain) {
+            await updateWebsiteVisit(
+                storage.activeSession.id,
+                lastFocusEvent.domain,
+                lastFocusEvent.timestamp,
+                now
+            );
+        }
     }
 
     // 3. Write tab_focus event for new domain
@@ -36,6 +58,16 @@ export async function handleTabActivated({ tabId }: { tabId: number, windowId?: 
             focusSessionId: storage.activeSession?.id ?? null,
             date,
         });
+
+        // Start new website visit tracking
+        if (storage.activeSession?.id) {
+            await startWebsiteVisit(
+                storage.activeSession.id,
+                domain,
+                classification,
+                now
+            );
+        }
 
         // 4. If focus session active and new domain is distracting: increment interruption count
         if (storage.activeSession?.status === 'in_progress' && classification === 'distracting') {
@@ -51,6 +83,68 @@ export async function handleTabActivated({ tabId }: { tabId: number, windowId?: 
             // Fire notification
             await fireInterruptionNotification(domain, storage.activeSession.taskName);
         }
+    }
+}
+
+// Helper function to start tracking a website visit
+async function startWebsiteVisit(
+    sessionId: string,
+    domain: string,
+    classification: string,
+    startTime: number
+): Promise<void> {
+    const { websiteVisits = [] } = await readStorage(['websiteVisits']);
+    
+    // Check if there's already an active visit for this domain in this session
+    const existingVisitIndex = websiteVisits.findIndex(
+        v => v.sessionId === sessionId && v.domain === domain && v.endTime === null
+    );
+    
+    if (existingVisitIndex === -1) {
+        // Create new visit
+        const visit: WebsiteVisit = {
+            id: `${sessionId}_${domain}_${startTime}`,
+            sessionId,
+            domain,
+            classification,
+            startTime,
+            endTime: null,
+            durationSeconds: null,
+            synced: false,
+        };
+        
+        websiteVisits.push(visit);
+        await writeStorage({ websiteVisits });
+    }
+}
+
+// Helper function to update website visit with end time
+async function updateWebsiteVisit(
+    sessionId: string,
+    domain: string,
+    startTime: number,
+    endTime: number
+): Promise<void> {
+    const { websiteVisits = [] } = await readStorage(['websiteVisits']);
+    
+    // Find the active visit for this domain in this session
+    const visitIndex = websiteVisits.findIndex(
+        v => v.sessionId === sessionId && 
+             v.domain === domain && 
+             v.endTime === null &&
+             Math.abs(v.startTime - startTime) < 1000 // Within 1 second tolerance
+    );
+    
+    if (visitIndex !== -1) {
+        const durationSeconds = Math.round((endTime - websiteVisits[visitIndex].startTime) / 1000);
+        
+        websiteVisits[visitIndex] = {
+            ...websiteVisits[visitIndex],
+            endTime,
+            durationSeconds,
+        };
+        
+        await writeStorage({ websiteVisits });
     }
 }
 
@@ -72,8 +166,19 @@ export async function handleWindowFocusChanged(windowId: number) {
     if (windowId === chrome.windows.WINDOW_ID_NONE) {
         // Browser lost focus
         const now = Date.now();
-        const { activeSession, settings } = await readStorage(['activeSession', 'settings']);
+        const { activeSession, settings, eventLog } = await readStorage(['activeSession', 'settings', 'eventLog']);
         const date = getTodayDate(settings?.timezone ?? 'UTC');
+
+        // Close any active website visit
+        const lastFocusEvent = getLastEventOfType(eventLog?.[date] ?? [], 'tab_focus');
+        if (lastFocusEvent && activeSession?.id && lastFocusEvent.domain) {
+            await updateWebsiteVisit(
+                activeSession.id,
+                lastFocusEvent.domain,
+                lastFocusEvent.timestamp,
+                now
+            );
+        }
 
         await appendEvent({
             type: 'window_blur', domain: null, classification: null,

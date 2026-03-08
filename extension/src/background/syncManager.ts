@@ -7,11 +7,17 @@ export async function attemptSync(): Promise<void> {
     if (!accessToken) return; // not logged in
     if (!navigator.onLine) return; // no connection
 
-    const { eventLog, sessionHistory, activeSession } = await readStorage(['eventLog', 'sessionHistory', 'activeSession']);
-    if (!eventLog && !sessionHistory && !activeSession) return;
+    const { eventLog, sessionHistory, activeSession, websiteVisits } = await readStorage([
+        'eventLog', 
+        'sessionHistory', 
+        'activeSession',
+        'websiteVisits'
+    ]);
+    if (!eventLog && !sessionHistory && !activeSession && !websiteVisits) return;
 
     const unsyncedEvents: BrowserEvent[] = [];
     const unsyncedSessions: FocusSession[] = [];
+    const unsyncedVisits: any[] = [];
 
     // Collect unsynced events
     if (eventLog) {
@@ -36,7 +42,16 @@ export async function attemptSync(): Promise<void> {
         unsyncedSessions.push(activeSession);
     }
 
-    if (unsyncedEvents.length === 0 && unsyncedSessions.length === 0) return;
+    // Collect unsynced website visits
+    if (websiteVisits) {
+        for (const visit of websiteVisits) {
+            if (!visit.synced && visit.endTime !== null) {
+                unsyncedVisits.push(visit);
+            }
+        }
+    }
+
+    if (unsyncedEvents.length === 0 && unsyncedSessions.length === 0 && unsyncedVisits.length === 0) return;
 
     try {
         // Sync events
@@ -101,6 +116,31 @@ export async function attemptSync(): Promise<void> {
             // Update session history with synced flags
             if (sessionHistory) {
                 await writeStorage({ sessionHistory: sessionHistory });
+            }
+        }
+
+        // Sync website visits
+        if (unsyncedVisits.length > 0) {
+            const response = await fetch(`${DASHBOARD_URL}/api/website-visits`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${accessToken}`,
+                },
+                body: JSON.stringify({ visits: unsyncedVisits }),
+            });
+
+            if (response.ok) {
+                // Mark visits as synced
+                const updatedVisits = websiteVisits.map(visit => {
+                    const wasSynced = unsyncedVisits.find(v => v.id === visit.id);
+                    if (wasSynced) {
+                        return { ...visit, synced: true };
+                    }
+                    return visit;
+                });
+                
+                await writeStorage({ websiteVisits: updatedVisits });
             }
         }
 

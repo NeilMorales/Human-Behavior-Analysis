@@ -47,6 +47,7 @@ export interface FocusSession {
     selfRating: number | null; // 1–5
     focusScore: number | null;
     synced: boolean;
+    syncAttempts?: number;   // Track number of sync attempts
 }
 
 // Daily summary — computed server-side, cached in extension storage
@@ -92,6 +93,9 @@ export interface StorageSchema {
     // Event log — keyed by date 'YYYY-MM-DD'
     eventLog: Record<string, BrowserEvent[]>;
 
+    // Website visits tracking
+    websiteVisits: WebsiteVisit[];
+
     // Today's cached summary (updated every minute by heartbeat)
     todaySummary: DailySummary | null;
 
@@ -100,6 +104,18 @@ export interface StorageSchema {
 
     // Last sync timestamp
     lastSyncAt: number | null;
+}
+
+// Website visit tracking
+export interface WebsiteVisit {
+    id: string;
+    sessionId: string;
+    domain: string;
+    classification: string;
+    startTime: number;
+    endTime: number | null;
+    durationSeconds: number | null;
+    synced: boolean;
 }
 
 export interface UserSettings {

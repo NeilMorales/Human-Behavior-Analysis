@@ -27,9 +27,9 @@ export default function PopupApp() {
                     const newState = { ...prev };
                     if (changes.activeSession) newState.activeSession = changes.activeSession.newValue as FocusSession | null;
                     if (changes.todaySummary) newState.todaySummary = changes.todaySummary.newValue as DailySummary | null;
-                    if (changes.user) newState.user = changes.user.newValue;
+                    if (changes.user) newState.user = changes.user.newValue as typeof newState.user;
                     if (changes.accessToken) {
-                        newState.accessToken = changes.accessToken.newValue;
+                        newState.accessToken = changes.accessToken.newValue as string | null;
                         setIsAuthenticated(!!changes.accessToken.newValue && !!newState.user);
                     }
                     return newState;
@@ -147,6 +147,76 @@ export default function PopupApp() {
             ) : (
                 <StartSession />
             )}
+
+            <button
+                onClick={() => {
+                    chrome.tabs.create({ url: 'http://localhost:3000/dashboard' });
+                }}
+                style={{
+                    width: '100%',
+                    marginTop: '12px',
+                    padding: '10px',
+                    background: 'transparent',
+                    border: '1px solid #333',
+                    borderRadius: '8px',
+                    color: '#00D1FF',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#1a1a1a';
+                    e.currentTarget.style.borderColor = '#00D1FF';
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.borderColor = '#333';
+                }}
+            >
+                📊 View Dashboard
+            </button>
+
+            <button
+                onClick={async () => {
+                    if (confirm('Are you sure you want to logout?')) {
+                        // Clear extension storage
+                        await chrome.storage.local.clear();
+                        
+                        // Clear dashboard cookies by opening logout endpoint
+                        await fetch('http://localhost:3000/api/auth/logout', {
+                            method: 'POST',
+                            credentials: 'include',
+                        }).catch(() => {});
+                        
+                        // Reload popup to show login form
+                        window.location.reload();
+                    }
+                }}
+                style={{
+                    width: '100%',
+                    marginTop: '8px',
+                    padding: '10px',
+                    background: 'transparent',
+                    border: '1px solid #ff4444',
+                    borderRadius: '8px',
+                    color: '#ff4444',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#ff4444';
+                    e.currentTarget.style.color = '#fff';
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.color = '#ff4444';
+                }}
+            >
+                🚪 Logout
+            </button>
         </div>
     );
 }

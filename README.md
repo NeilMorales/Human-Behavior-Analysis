@@ -57,18 +57,27 @@ BehaviorIQ helps users understand and improve their productivity by:
    ```
 4. Get your API keys from Settings → API
 
-### 2. Frontend Setup
+### 2. Environment Setup
+
+Create a `.env` file in the root directory:
 
 ```bash
-cd frontend
-npm install
-
-# Create .env.local file
-cat > .env.local << EOF
+# Create root .env file
+cat > .env << EOF
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 EOF
+
+# Copy to frontend directory (Next.js requires it there)
+cp .env frontend/.env
+```
+
+### 3. Frontend Setup
+
+```bash
+cd frontend
+npm install
 
 # Start development server
 npm run dev
@@ -76,7 +85,7 @@ npm run dev
 
 Dashboard will be at: `http://localhost:3000`
 
-### 3. Extension Setup
+### 4. Extension Setup
 
 ```bash
 cd extension
@@ -90,7 +99,7 @@ npm run build
 3. Click "Load unpacked"
 4. Select the `extension/dist` folder
 
-### 4. Test the Flow
+### 5. Test the Flow
 
 1. Click extension icon → Login/Signup
 2. Start a focus session

@@ -40,7 +40,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                     break;
 
                 case 'STOP_SESSION':
-                    const stoppedSession = await stopSession(message.payload);
+                    // Handle stop from dashboard or popup
+                    const payload = message.payload || { status: 'completed' };
+                    const stoppedSession = await stopSession(payload);
                     sendResponse({ success: true, session: stoppedSession });
                     break;
 

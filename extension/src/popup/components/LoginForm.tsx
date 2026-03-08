@@ -25,6 +25,7 @@ export function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => void }) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
+                credentials: 'include', // IMPORTANT: This sets cookies on the dashboard domain
             });
 
             const data = await response.json();
@@ -33,7 +34,7 @@ export function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => void }) {
                 throw new Error(data.error || 'Authentication failed');
             }
 
-            // Store auth tokens and user data
+            // Store auth tokens and user data in extension storage
             await writeStorage({
                 accessToken: data.session.access_token,
                 refreshToken: data.session.refresh_token,

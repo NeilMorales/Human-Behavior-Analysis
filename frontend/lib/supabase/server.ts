@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { customFetch } from './customFetch'
 
 export async function createClient() {
     const cookieStore = await cookies()
@@ -21,6 +22,9 @@ export async function createClient() {
                         // Ignore if called from a Server Component
                     }
                 },
+            },
+            global: {
+                fetch: customFetch,
             },
         }
     )
@@ -46,6 +50,9 @@ export async function createAdminClient() {
                         // Ignore if called from a Server Component
                     }
                 },
+            },
+            global: {
+                fetch: customFetch,
             },
         }
     )

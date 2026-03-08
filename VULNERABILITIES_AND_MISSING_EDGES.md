@@ -74,12 +74,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 **Impact:** Server-side operations will fail
 
 **Issue:**
-- `.env.local` has placeholder `YOUR_SUPABASE_SERVICE_ROLE_KEY`
+- `.env` has placeholder `YOUR_SUPABASE_SERVICE_ROLE_KEY`
 - Admin operations require service role key
 - Some API routes may fail without it
 
 **Location:**
-- `frontend/.env.local` line 3
+- `.env` and `frontend/.env` line 3
 
 **Fix Required:**
 1. Get service role key from Supabase dashboard

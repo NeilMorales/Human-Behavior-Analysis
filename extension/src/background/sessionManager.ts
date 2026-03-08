@@ -33,14 +33,40 @@ export async function startSession(params: {
         selfRating: null,
         focusScore: null,
         synced: false,
+        syncAttempts: 0,
     };
 
     // 3. Save to storage immediately
     await writeStorage({ activeSession: session });
 
-    // 3.5. Sync active session to database immediately (if logged in)
+    // 3.5. Sync active session to database immediately (if logged in) with retries
     const { attemptSync } = await import('./syncManager');
-    attemptSync().catch(err => console.error('Failed to sync active session:', err));
+    let syncSuccess = false;
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    while (!syncSuccess && attempts < maxAttempts) {
+        try {
+            await attemptSync();
+            syncSuccess = true;
+            
+            // Update session with synced flag
+            const updatedSession = { ...session, synced: true, syncAttempts: attempts + 1 };
+            await writeStorage({ activeSession: updatedSession });
+        } catch (err) {
+            attempts++;
+            console.error(`Sync attempt ${attempts} failed:`, err);
+            
+            // Update sync attempts count
+            const updatedSession = { ...session, syncAttempts: attempts };
+            await writeStorage({ activeSession: updatedSession });
+            
+            if (attempts < maxAttempts) {
+                // Exponential backoff: 1s, 2s, 4s
+                await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts - 1) * 1000));
+            }
+        }
+    }
 
     // 4. Set alarm for planned end time
     const endTimeMinutes = params.plannedDuration;

@@ -16,19 +16,22 @@
 
 ### Step 2: Configure Environment Variables
 
-#### Frontend (.env.local)
+#### Root .env file
 ```bash
-cd frontend
-```
-
-Make sure `frontend/.env.local` has:
-```env
+# Create .env in project root
+cat > .env << EOF
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+EOF
+
+# Copy to frontend directory (Next.js requires it there)
+cp .env frontend/.env
 ```
 
-Get these from: Supabase Dashboard → Settings → API
+Get these values from: Supabase Dashboard → Settings → API
+
+**Note:** The project uses a single `.env` file at the root, which is copied to `frontend/.env` for Next.js to read.
 
 ---
 
@@ -119,7 +122,7 @@ You'll know everything is working when:
 
 ### Dashboard not showing active session
 → Check frontend console for errors
-→ Verify SUPABASE_SERVICE_ROLE_KEY in .env.local
+→ Verify environment variables in .env and frontend/.env
 → Check Network tab - should see /api/sessions/active polling
 
 ### Sessions not in database

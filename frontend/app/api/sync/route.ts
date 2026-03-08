@@ -26,6 +26,8 @@ export async function POST(request: Request) {
             domain: e.domain,
             classification: e.classification,
             timestamp: new Date(e.timestamp).toISOString(),
+            timestamp_ms: e.timestamp, // Add timestamp_ms field
+            date: e.date, // Add date field
             focus_session_id: e.focusSessionId,
         }));
 

@@ -16,7 +16,6 @@ export async function GET() {
             .select('*')
             .eq('user_id', user.id)
             .eq('status', 'in_progress')
-            .eq('is_deleted', false)
             .order('start_time', { ascending: false })
             .limit(1)
             .maybeSingle();
@@ -33,11 +32,23 @@ export async function GET() {
             const plannedEndTime = startTime + (session.planned_duration * 60 * 1000);
             const remainingMs = plannedEndTime - now;
             
+            // Check if session was stopped early
+            const stoppedEarly = session.status === 'interrupted';
+            
+            // Fetch website visits for this session
+            const { data: visits } = await supabase
+                .from('website_visits')
+                .select('*')
+                .eq('session_id', session.session_id)
+                .order('start_time', { ascending: true });
+            
             return NextResponse.json({ 
                 session: {
                     ...session,
                     remainingMs: Math.max(0, remainingMs),
                     elapsedMs: now - startTime,
+                    stoppedEarly,
+                    websiteVisits: visits || [],
                 }
             });
         }
