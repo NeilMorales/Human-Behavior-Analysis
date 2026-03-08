@@ -3,28 +3,90 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Play, Square, Globe } from 'lucide-react';
+import { Play, Square } from 'lucide-react';
 import { useActiveSession } from '@/hooks/useActiveSession';
 import { CurrentWebsiteCard } from '@/components/dashboard/CurrentWebsiteCard';
+
+const CATEGORIES = ['Study', 'Coding', 'Reading', 'Project', 'Writing', 'Design', 'Other'];
 
 export default function FocusModePage() {
     const { session: activeSession, loading, error } = useActiveSession();
     const [taskName, setTaskName] = useState('');
+    const [category, setCategory] = useState('Coding');
+    const [duration, setDuration] = useState(25);
     const [timeLeft, setTimeLeft] = useState(0);
+    const [todayFocus, setTodayFocus] = useState(0); // in minutes
+    const [totalSessions, setTotalSessions] = useState(0);
 
-    // Update timer every second
+    // Fetch today's focus time and total sessions
+    useEffect(() => {
+        async function fetchStats() {
+            try {
+                const response = await fetch('/api/sessions');
+                if (response.ok) {
+                    const data = await response.json();
+                    const sessions = data.sessions || [];
+                    
+                    // Calculate today's focus time
+                    const today = new Date().toDateString();
+                    const todaySessions = sessions.filter((s: any) => {
+                        const sessionDate = new Date(s.start_time).toDateString();
+                        return sessionDate === today && s.status === 'completed';
+                    });
+                    const todayMinutes = todaySessions.reduce((sum: number, s: any) => sum + (s.actual_duration || 0), 0);
+                    setTodayFocus(todayMinutes);
+                    
+                    // Count total completed sessions
+                    const completed = sessions.filter((s: any) => s.status === 'completed').length;
+                    setTotalSessions(completed);
+                }
+            } catch (err) {
+                console.error('Failed to fetch stats:', err);
+            }
+        }
+        fetchStats();
+    }, [activeSession]); // Refresh when session changes
+
+    // Update timer every second and auto-stop when complete
     useEffect(() => {
         if (!activeSession) {
             setTimeLeft(0);
             return;
         }
 
-        const updateTimer = () => {
+        let hasAutoStopped = false;
+
+        const updateTimer = async () => {
             const now = Date.now();
             const startTime = new Date(activeSession.start_time).getTime();
             const plannedEndTime = startTime + (activeSession.planned_duration * 60 * 1000);
             const remaining = Math.max(0, plannedEndTime - now);
-            setTimeLeft(Math.floor(remaining / 1000)); // Convert to seconds
+            const remainingSeconds = Math.floor(remaining / 1000);
+            setTimeLeft(remainingSeconds);
+
+            // Auto-stop when timer reaches 0 (only once)
+            if (remainingSeconds === 0 && !hasAutoStopped) {
+                hasAutoStopped = true;
+                try {
+                    // Stop via API
+                    const response = await fetch(`/api/sessions/${activeSession.session_id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            status: 'completed',
+                            endTime: Date.now(),
+                            actualDuration: Math.floor((Date.now() - new Date(activeSession.start_time).getTime()) / 60000),
+                        }),
+                    });
+
+                    if (response.ok) {
+                        // Refresh page to update UI
+                        window.location.reload();
+                    }
+                } catch (err) {
+                    console.error('Failed to auto-stop session:', err);
+                }
+            }
         };
 
         updateTimer();
@@ -35,16 +97,18 @@ export default function FocusModePage() {
     const minutes = Math.floor(timeLeft / 60);
     const seconds = timeLeft % 60;
     
-    // Calculate progress percentage
     const totalSeconds = activeSession ? activeSession.planned_duration * 60 : 0;
     const elapsedSeconds = totalSeconds - timeLeft;
     const progressPercent = totalSeconds > 0 ? (elapsedSeconds / totalSeconds) * 100 : 0;
 
     const handleStart = async () => {
-        if (!taskName.trim()) return;
+        if (!taskName.trim()) {
+            alert('Please enter a task name');
+            return;
+        }
         
         try {
-            const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const sessionId = crypto.randomUUID();
             const startTime = Date.now();
             
             const response = await fetch('/api/sessions', {
@@ -53,9 +117,9 @@ export default function FocusModePage() {
                 body: JSON.stringify({
                     id: sessionId,
                     taskName: taskName,
-                    category: 'Work',
-                    mode: 'focus',
-                    plannedDuration: 25,
+                    category: category,
+                    mode: 'free', // Valid mode: 'free' or 'pomodoro'
+                    plannedDuration: duration,
                     startTime: startTime,
                     status: 'in_progress',
                 }),
@@ -66,7 +130,6 @@ export default function FocusModePage() {
                 throw new Error(error.error || 'Failed to start session');
             }
             
-            // Refresh page to show active session
             window.location.reload();
         } catch (e: any) {
             console.error(e);
@@ -251,17 +314,42 @@ export default function FocusModePage() {
                                     placeholder="What are you working on?"
                                     value={taskName}
                                     onChange={(e) => setTaskName(e.target.value)}
+                                    required
                                     className="w-full bg-bg-elevated/50 border-2 border-border-light rounded-2xl px-6 py-4 text-white text-center text-lg focus:outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/20 transition-all duration-300 placeholder:text-text-muted"
                                 />
+                                
+                                <select
+                                    value={category}
+                                    onChange={(e) => setCategory(e.target.value)}
+                                    required
+                                    className="w-full bg-bg-elevated/50 border-2 border-border-light rounded-2xl px-6 py-4 text-white text-center text-lg focus:outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/20 transition-all duration-300"
+                                >
+                                    {CATEGORIES.map(cat => (
+                                        <option key={cat} value={cat} className="bg-bg-tertiary">{cat}</option>
+                                    ))}
+                                </select>
+
+                                <div className="flex items-center justify-center gap-4">
+                                    <label className="text-text-secondary font-medium">Duration:</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="480"
+                                        value={duration}
+                                        onChange={(e) => setDuration(parseInt(e.target.value) || 25)}
+                                        className="w-24 bg-bg-elevated/50 border-2 border-border-light rounded-xl px-4 py-2 text-white text-center text-lg focus:outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/20 transition-all duration-300 font-[family-name:var(--font-fira-code)]"
+                                    />
+                                    <span className="text-text-secondary">minutes</span>
+                                </div>
                             </div>
 
                             <div className="relative">
                                 <div className="text-8xl font-black text-white/30 font-[family-name:var(--font-fira-code)] tracking-tighter">
-                                    25:00
+                                    {String(duration).padStart(2, '0')}:00
                                 </div>
                                 <div className="absolute inset-0 flex items-center justify-center">
                                     <div className="text-8xl font-black bg-gradient-to-r from-blue-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent font-[family-name:var(--font-fira-code)] tracking-tighter opacity-50">
-                                        25:00
+                                        {String(duration).padStart(2, '0')}:00
                                     </div>
                                 </div>
                             </div>
@@ -297,7 +385,7 @@ export default function FocusModePage() {
                     <CardContent className="p-8">
                         <div className="text-sm text-text-secondary mb-3 font-medium">Today's Focus</div>
                         <div className="text-3xl font-black font-[family-name:var(--font-fira-code)] bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
-                            0h 0m
+                            {Math.floor(todayFocus / 60)}h {todayFocus % 60}m
                         </div>
                     </CardContent>
                 </Card>
@@ -305,7 +393,7 @@ export default function FocusModePage() {
                     <CardContent className="p-8">
                         <div className="text-sm text-text-secondary mb-3 font-medium">Sessions</div>
                         <div className="text-3xl font-black font-[family-name:var(--font-fira-code)] bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                            0 completed
+                            {totalSessions} completed
                         </div>
                     </CardContent>
                 </Card>

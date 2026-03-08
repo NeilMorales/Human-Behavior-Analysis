@@ -4,7 +4,7 @@
 
 CREATE TABLE IF NOT EXISTS website_visits (
     visit_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    session_id TEXT NOT NULL,
+    session_id UUID NOT NULL REFERENCES focus_sessions(session_id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     domain TEXT NOT NULL,
     classification TEXT CHECK (classification IN ('productive', 'neutral', 'distracting')),

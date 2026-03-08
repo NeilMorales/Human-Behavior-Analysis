@@ -101,9 +101,10 @@ async function startWebsiteVisit(
     );
     
     if (existingVisitIndex === -1) {
-        // Create new visit
+        // Create new visit with proper UUID
+        const { generateUUID } = await import('../shared/utils');
         const visit: WebsiteVisit = {
-            id: `${sessionId}_${domain}_${startTime}`,
+            id: generateUUID(),
             sessionId,
             domain,
             classification,
